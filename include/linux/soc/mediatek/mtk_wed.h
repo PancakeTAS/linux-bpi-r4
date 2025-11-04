@@ -154,6 +154,7 @@ struct mtk_wed_device {
 		bool wcid_512;
 		bool hw_rro;
 		bool msi;
+		bool hif2;
 
 		u16 token_start;
 		unsigned int nbuf;
@@ -188,6 +189,7 @@ struct mtk_wed_device {
 		int (*reset)(struct mtk_wed_device *wed);
 		void (*reset_complete)(struct mtk_wed_device *wed);
 	} wlan;
+
 #endif
 };
 

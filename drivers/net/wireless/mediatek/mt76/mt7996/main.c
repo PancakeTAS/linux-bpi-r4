@@ -665,8 +665,8 @@ mt7996_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	       unsigned int link_id, u16 queue,
 	       const struct ieee80211_tx_queue_params *params)
 {
-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
-	struct mt7996_vif_link *mlink = mt7996_vif_link(dev, vif, link_id);
+	struct mt7996_vif *mvif = (struct mt7996_vif *)vif->drv_priv;
+	struct mt7996_vif_link_info *link_info = &mvif->link_info[link_id];
 	static const u8 mq_to_aci[] = {
 		[IEEE80211_AC_VO] = 3,
 		[IEEE80211_AC_VI] = 2,
@@ -675,7 +675,7 @@ mt7996_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	};
 
 	/* firmware uses access class index */
-	mlink->queue_params[mq_to_aci[queue]] = *params;
+	link_info->queue_params[mq_to_aci[queue]] = *params;
 	/* no need to update right away, we'll get BSS_CHANGED_QOS */
 
 	return 0;
@@ -757,7 +757,6 @@ mt7996_get_txpower(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	return 0;
 }
-
 static u8
 mt7996_get_rates_table(struct mt7996_phy *phy, struct ieee80211_bss_conf *conf,
 		       bool beacon, bool mcast)
@@ -1339,12 +1338,10 @@ static void mt7996_tx(struct ieee80211_hw *hw,
 	}
 
 	if (mvif) {
-		struct mt76_vif_link *mlink = &mvif->deflink.mt76;
+		struct mt76_vif_link *mlink;
 
-		if (link_id < IEEE80211_LINK_UNSPECIFIED)
-			mlink = rcu_dereference(mvif->mt76.link[link_id]);
-
-		if (mlink->wcid)
+		mlink = rcu_dereference(mvif->mt76.link[link_id]);
+		if (mlink && mlink->wcid)
 			wcid = mlink->wcid;
 
 		if (mvif->mt76.roc_phy &&
@@ -1352,7 +1349,7 @@ static void mt7996_tx(struct ieee80211_hw *hw,
 			mphy = mvif->mt76.roc_phy;
 			if (mphy->roc_link)
 				wcid = mphy->roc_link->wcid;
-		} else {
+		} else if (mlink) {
 			mphy = mt76_vif_link_phy(mlink);
 		}
 	}
@@ -1362,7 +1359,7 @@ static void mt7996_tx(struct ieee80211_hw *hw,
 		goto unlock;
 	}
 
-	if (msta && link_id < IEEE80211_LINK_UNSPECIFIED) {
+	if (msta) {
 		struct mt7996_sta_link *msta_link;
 
 		msta_link = rcu_dereference(msta->link[link_id]);
