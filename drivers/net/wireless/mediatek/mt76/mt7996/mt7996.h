@@ -488,6 +488,8 @@ struct mt7996_dev {
 		u8 type:4;
 		u8 fem:4;
 	} var;
+
+	struct led_classdev led24, led5, led6;
 };
 
 enum {

@@ -274,70 +274,61 @@ static int mt7996_thermal_init(struct mt7996_phy *phy)
 	return 0;
 }
 
-static void mt7996_led_set_config(struct led_classdev *led_cdev,
+static void mt7996_led_set_config(struct led_classdev *led_cdev, u8 idx,
 				  u8 delay_on, u8 delay_off)
 {
 	struct mt7996_dev *dev;
 	struct mt76_phy *mphy;
 	u32 val;
 
-	mphy = container_of(led_cdev, struct mt76_phy, leds.cdev);
-	dev = container_of(mphy->dev, struct mt7996_dev, mt76);
+	if (idx == 0)
+		dev = container_of(led_cdev, struct mt7996_dev, led24);
+	else if (idx == 1)
+		dev = container_of(led_cdev, struct mt7996_dev, led5);
+	else
+		dev = container_of(led_cdev, struct mt7996_dev, led6);
+	mphy = dev->phy.mt76;
 
 	/* select TX blink mode, 2: only data frames */
-	mt76_rmw_field(dev, MT_TMAC_TCR0(mphy->band_idx), MT_TMAC_TCR0_TX_BLINK, 2);
+	mt76_rmw_field(dev, MT_TMAC_TCR0(mphy->band_idx + idx), MT_TMAC_TCR0_TX_BLINK, 2);
 
 	/* enable LED */
-	mt76_wr(dev, MT_LED_EN(mphy->band_idx), 1);
+	mt76_wr(dev, MT_LED_EN(mphy->band_idx + idx), 1);
 
-	/* set LED Tx blink on/off time */
-	val = FIELD_PREP(MT_LED_TX_BLINK_ON_MASK, delay_on) |
-	      FIELD_PREP(MT_LED_TX_BLINK_OFF_MASK, delay_off);
-	mt76_wr(dev, MT_LED_TX_BLINK(mphy->band_idx), val);
-
-	/* turn LED off */
-	if (delay_off == 0xff && delay_on == 0x0) {
-		val = MT_LED_CTRL_POLARITY | MT_LED_CTRL_KICK;
-	} else {
-		/* control LED */
-		val = MT_LED_CTRL_BLINK_MODE | MT_LED_CTRL_KICK;
-		if (mphy->band_idx == MT_BAND1)
-			val |= MT_LED_CTRL_BLINK_BAND_SEL;
-	}
-
-	if (mphy->leds.al)
+	/* control LED */
+	val = MT_LED_CTRL_KICK;
+	if (delay_off)
 		val |= MT_LED_CTRL_POLARITY;
 
-	mt76_wr(dev, MT_LED_CTRL(mphy->band_idx), val);
-	mt76_clear(dev, MT_LED_CTRL(mphy->band_idx), MT_LED_CTRL_KICK);
+	mt76_wr(dev, MT_LED_CTRL(mphy->band_idx + idx), val);
+	mt76_clear(dev, MT_LED_CTRL(mphy->band_idx + idx), MT_LED_CTRL_KICK);
 }
 
-static int mt7996_led_set_blink(struct led_classdev *led_cdev,
-				unsigned long *delay_on,
-				unsigned long *delay_off)
-{
-	u16 delta_on = 0, delta_off = 0;
-
-#define HW_TICK		10
-#define TO_HW_TICK(_t)	(((_t) > HW_TICK) ? ((_t) / HW_TICK) : HW_TICK)
-
-	if (*delay_on)
-		delta_on = TO_HW_TICK(*delay_on);
-	if (*delay_off)
-		delta_off = TO_HW_TICK(*delay_off);
-
-	mt7996_led_set_config(led_cdev, delta_on, delta_off);
-
-	return 0;
-}
-
-static void mt7996_led_set_brightness(struct led_classdev *led_cdev,
+static void mt7996_led_set_brightness_24g(struct led_classdev *led_cdev,
 				      enum led_brightness brightness)
 {
 	if (!brightness)
-		mt7996_led_set_config(led_cdev, 0, 0xff);
+		mt7996_led_set_config(led_cdev, 0, 0, 0xff);
 	else
-		mt7996_led_set_config(led_cdev, 0xff, 0);
+		mt7996_led_set_config(led_cdev, 0, 0xff, 0);
+}
+
+static void mt7996_led_set_brightness_5g(struct led_classdev *led_cdev,
+				      enum led_brightness brightness)
+{
+	if (!brightness)
+		mt7996_led_set_config(led_cdev, 1, 0, 0xff);
+	else
+		mt7996_led_set_config(led_cdev, 1, 0xff, 0);
+}
+
+static void mt7996_led_set_brightness_6g(struct led_classdev *led_cdev,
+				      enum led_brightness brightness)
+{
+	if (!brightness)
+		mt7996_led_set_config(led_cdev, 2, 0, 0xff);
+	else
+		mt7996_led_set_config(led_cdev, 2, 0xff, 0);
 }
 
 static void __mt7996_init_txpower(struct mt7996_phy *phy,
@@ -525,14 +516,23 @@ mt7996_init_wiphy(struct ieee80211_hw *hw, struct mtk_wed_device *wed)
 
 	hw->max_tx_fragments = 4;
 
-	/* init led callbacks */
-	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
-		dev->mphy.leds.cdev.brightness_set = mt7996_led_set_brightness;
-		dev->mphy.leds.cdev.blink_set = mt7996_led_set_blink;
-	}
-
 	wiphy->max_scan_ssids = 4;
 	wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
+
+	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
+		dev->led24.name = "mt76-24g";
+		dev->led24.brightness_set = mt7996_led_set_brightness_24g;
+		led_classdev_register(mdev->dev, &dev->led24);
+
+		dev->led5.name = "mt76-5g";
+		dev->led5.brightness_set = mt7996_led_set_brightness_5g;
+		led_classdev_register(mdev->dev, &dev->led5);
+
+		dev->led6.name = "mt76-6g";
+		dev->led6.brightness_set = mt7996_led_set_brightness_6g;
+		led_classdev_register(mdev->dev, &dev->led6);
+	}
+
 
 	mt7996_init_wiphy_band(hw, &dev->phy);
 }
@@ -745,8 +745,16 @@ error:
 static void
 mt7996_unregister_phy(struct mt7996_phy *phy)
 {
-	if (phy)
+	if (phy) {
 		mt7996_unregister_thermal(phy);
+
+		if (IS_ENABLED(CONFIG_MT76_LEDS)) {
+			struct mt7996_dev *dev = phy->dev;
+			led_classdev_unregister(&dev->led24);
+			led_classdev_unregister(&dev->led5);
+			led_classdev_unregister(&dev->led6);
+		}
+	}
 }
 
 static void mt7996_init_work(struct work_struct *work)
