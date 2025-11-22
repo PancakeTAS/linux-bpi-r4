@@ -74,7 +74,7 @@
 
 #define Q_READ(_q, _field) ({						\
 	u32 _offset = offsetof(struct mt76_queue_regs, _field);		\
-	u32 _val = 0;							\
+	u32 _val;							\
 	if ((_q)->flags & MT_QFLAG_NPU) {				\
 		struct airoha_npu *npu;					\
 									\
@@ -174,7 +174,9 @@ void mt76_dma_queue_reset(struct mt76_dev *dev, struct mt76_queue *q,
 static inline void
 mt76_dma_reset_tx_queue(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	dev->queue_ops->reset_q(dev, q, true);
+	bool reset_idx = q && !mt76_queue_is_npu_tx(q);
+
+	dev->queue_ops->reset_q(dev, q, reset_idx);
 	if (mtk_wed_device_active(&dev->mmio.wed))
 		mt76_wed_dma_setup(dev, q, true);
 }
