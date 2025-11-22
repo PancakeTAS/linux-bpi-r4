@@ -132,6 +132,7 @@ struct lvts_data {
 	int num_init_cmd;
 	int temp_factor;
 	int temp_offset;
+	int golden_temp;
 	int gt_calib_bit_offset;
 	unsigned int def_calibration;
 };
@@ -804,8 +805,10 @@ static int lvts_golden_temp_init(struct device *dev, u8 *calib,
 	gt = (((u32 *)calib)[0] >> lvts_data->gt_calib_bit_offset) & 0xff;
 
 	/* A zero value for gt means that device has invalid efuse data */
-	if (gt && gt < LVTS_GOLDEN_TEMP_MAX)
+	if (gt && gt <= LVTS_GOLDEN_TEMP_MAX)
 		golden_temp = gt;
+	else
+		golden_temp = lvts_data->golden_temp;
 
 	golden_temp_offset = golden_temp * 500 + lvts_data->temp_offset;
 
@@ -915,7 +918,7 @@ static void lvts_write_config(struct lvts_ctrl *lvts_ctrl, const u32 *cmds, int 
 	 */
 	for (i = 0; i < nr_cmds; i++) {
 		writel(cmds[i], LVTS_CONFIG(lvts_ctrl->base));
-		usleep_range(2, 4);
+		usleep_range(5, 15);
 	}
 }
 
@@ -1762,6 +1765,7 @@ static const struct lvts_data mt7988_lvts_ap_data = {
 	.num_init_cmd	= ARRAY_SIZE(mt7988_init_cmds),
 	.temp_factor	= LVTS_COEFF_A_MT7988,
 	.temp_offset	= LVTS_COEFF_B_MT7988,
+	.golden_temp	= LVTS_GOLDEN_TEMP_DEFAULT,
 	.gt_calib_bit_offset = 24,
 };
 
