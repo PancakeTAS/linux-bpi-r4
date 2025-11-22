@@ -93,44 +93,6 @@ mt7996_eeprom_parse_stream(const u8 *eeprom, u8 band_idx, u8 *path,
 	}
 }
 
-static bool mt7996_eeprom_variant_valid(struct mt7996_dev *dev, const u8 *def)
-{
-#define FEM_INT	0
-#define FEM_EXT	3
-	u8 *eeprom = dev->mt76.eeprom.data, fem[2];
-	int i;
-
-	for (i = 0; i < 2; i++)
-		fem[i] = u8_get_bits(eeprom[MT_EE_WIFI_CONF + 6 + i],
-				     MT_EE_WIFI_PA_LNA_CONFIG);
-
-	if (dev->var.fem == MT7996_FEM_EXT &&
-	    !(fem[0] == FEM_EXT && fem[1] == FEM_EXT))
-		return false;
-	else if (dev->var.fem == MT7996_FEM_INT &&
-		 !(fem[0] == FEM_INT && fem[1] == FEM_INT))
-		return false;
-	else if (dev->var.fem == MT7996_FEM_MIX &&
-		 !(fem[0] == FEM_INT && fem[1] == FEM_EXT))
-		return false;
-
-	for (i = 0; i < __MT_MAX_BAND; i++) {
-		u8 path, rx_path, nss;
-		u8 def_path, def_rx_path, def_nss;
-
-		if (!dev->mt76.phys[i])
-			continue;
-
-		mt7996_eeprom_parse_stream(eeprom, i, &path, &rx_path, &nss);
-		mt7996_eeprom_parse_stream(def, i, &def_path, &def_rx_path,
-					   &def_nss);
-		if (path > def_path || rx_path > def_rx_path || nss > def_nss)
-			return false;
-	}
-
-	return true;
-}
-
 static int
 mt7996_eeprom_check_or_use_default(struct mt7996_dev *dev, bool use_default)
 {
@@ -148,12 +110,21 @@ mt7996_eeprom_check_or_use_default(struct mt7996_dev *dev, bool use_default)
 		goto out;
 	}
 
-	if (!use_default && mt7996_eeprom_variant_valid(dev, fw->data))
-		goto out;
-
-	dev_warn(dev->mt76.dev, "eeprom load fail, use default bin\n");
-	memcpy(eeprom, fw->data, MT7996_EEPROM_SIZE);
-	dev->flash_mode = true;
+	eeprom[MT_EE_TX0_POWER_2G] = fw->data[MT_EE_TX0_POWER_2G];
+	eeprom[MT_EE_TX0_POWER_2G+1] = fw->data[MT_EE_TX0_POWER_2G+1];
+	eeprom[MT_EE_TX0_POWER_2G+2] = fw->data[MT_EE_TX0_POWER_2G+2];
+	eeprom[MT_EE_TX0_POWER_2G+3] = fw->data[MT_EE_TX0_POWER_2G+3];
+	eeprom[MT_EE_TX0_POWER_2G+4] = fw->data[MT_EE_TX0_POWER_2G+4];
+	eeprom[MT_EE_TX0_POWER_5G] = fw->data[MT_EE_TX0_POWER_5G];
+	eeprom[MT_EE_TX0_POWER_5G+1] = fw->data[MT_EE_TX0_POWER_5G+1];
+	eeprom[MT_EE_TX0_POWER_5G+2] = fw->data[MT_EE_TX0_POWER_5G+2];
+	eeprom[MT_EE_TX0_POWER_5G+3] = fw->data[MT_EE_TX0_POWER_5G+3];
+	eeprom[MT_EE_TX0_POWER_5G+4] = fw->data[MT_EE_TX0_POWER_5G+4];
+	eeprom[MT_EE_TX0_POWER_6G] = fw->data[MT_EE_TX0_POWER_6G];
+	eeprom[MT_EE_TX0_POWER_6G+1] = fw->data[MT_EE_TX0_POWER_6G+1];
+	eeprom[MT_EE_TX0_POWER_6G+2] = fw->data[MT_EE_TX0_POWER_6G+2];
+	eeprom[MT_EE_TX0_POWER_6G+3] = fw->data[MT_EE_TX0_POWER_6G+3];
+	eeprom[MT_EE_TX0_POWER_6G+4] = fw->data[MT_EE_TX0_POWER_6G+4];
 
 out:
 	release_firmware(fw);
