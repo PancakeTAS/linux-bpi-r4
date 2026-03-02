@@ -45,7 +45,8 @@ static int mt7622_wmac_probe(struct platform_device *pdev)
 	return mt7615_mmio_probe(&pdev->dev, mem_base, irq, mt7615e_reg_map);
 }
 
-static void mt7622_wmac_remove(struct platform_device *pdev)
+static void
+mt7622_wmac_remove(struct platform_device *pdev)
 {
 	struct mt7615_dev *dev = platform_get_drvdata(pdev);
 

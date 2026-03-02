@@ -91,6 +91,8 @@ int mt7925_mac_init(struct mt792x_dev *dev)
 
 	mt7925_mac_init_basic_rates(dev);
 
+	memzero_explicit(&dev->mt76.alpha2, sizeof(dev->mt76.alpha2));
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mt7925_mac_init);
@@ -274,7 +276,7 @@ int mt7925_register_device(struct mt792x_dev *dev)
 	dev->mphy.hw->wiphy->available_antennas_rx = dev->mphy.chainmask;
 	dev->mphy.hw->wiphy->available_antennas_tx = dev->mphy.chainmask;
 
-	queue_work(system_percpu_wq, &dev->init_work);
+	queue_work(system_wq, &dev->init_work);
 
 	return 0;
 }

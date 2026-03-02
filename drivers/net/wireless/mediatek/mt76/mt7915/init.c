@@ -415,6 +415,9 @@ mt7915_init_wiphy(struct mt7915_phy *phy)
 
 	hw->max_tx_fragments = 4;
 
+	if (!phy->dev->dbdc_support)
+		wiphy->txq_memory_limit = 32 << 20; /* 32 MiB */
+
 	if (phy->mt76->cap.has_2ghz) {
 		phy->mt76->sband_2g.sband.ht_cap.cap |=
 			IEEE80211_HT_CAP_LDPC_CODING |
@@ -1294,6 +1297,7 @@ free_phy2:
 
 void mt7915_unregister_device(struct mt7915_dev *dev)
 {
+	cancel_work_sync(&dev->dump_work);
 	mt7915_unregister_ext_phy(dev);
 	mt7915_coredump_unregister(dev);
 	mt7915_unregister_thermal(&dev->phy);
