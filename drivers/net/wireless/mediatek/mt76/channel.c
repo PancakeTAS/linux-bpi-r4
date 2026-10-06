@@ -330,6 +330,8 @@ void mt76_roc_complete(struct mt76_phy *phy)
 	    !test_bit(MT76_MCU_RESET, &dev->phy.state)) {
 		__mt76_set_channel(phy, &phy->main_chandef, false);
 		mt76_offchannel_notify(phy, false);
+	} else {
+		phy->offchannel = false;
 	}
 	mt76_put_vif_phy_link(phy, phy->roc_vif, phy->roc_link);
 	phy->roc_vif = NULL;
@@ -423,7 +425,7 @@ int mt76_cancel_remain_on_channel(struct ieee80211_hw *hw,
 	struct mt76_vif_data *mvif = mlink->mvif;
 	struct mt76_phy *phy = mvif->roc_phy;
 
-	if (!phy)
+	if (!phy || phy->roc_vif != vif)
 		return 0;
 
 	mt76_abort_roc(phy);

@@ -15,6 +15,7 @@
 #include <linux/average.h>
 #include <linux/soc/airoha/airoha_offload.h>
 #include <linux/soc/mediatek/mtk_wed.h>
+#include <net/netlink.h>
 #include <net/mac80211.h>
 #include <net/page_pool/helpers.h>
 #include "util.h"
@@ -28,6 +29,9 @@
 #define MT_TXQ_FREE_THR		32
 
 #define MT76_TOKEN_FREE_THR	64
+
+#define MT76_WED_WDS_MIN	256
+#define MT76_WED_WDS_MAX	272
 
 #define MT_QFLAG_WED_RING	GENMASK(1, 0)
 #define MT_QFLAG_WED_TYPE	GENMASK(4, 2)
@@ -472,7 +476,7 @@ struct mt76_rx_tid {
 
 	u8 started:1, stopped:1, timer_pending:1;
 
-	struct sk_buff *reorder_buf[] __counted_by(size);
+	struct sk_buff *reorder_buf[];
 };
 
 #define MT_TX_CB_DMA_DONE		BIT(0)
@@ -1426,6 +1430,13 @@ mtxq_to_txq(struct mt76_txq *mtxq)
 	return container_of(ptr, struct ieee80211_txq, drv_priv);
 }
 
+/* peer-wide state uses the wcid of the primary link */
+static inline struct mt76_wcid *
+mt76_wcid_primary(struct mt76_wcid *wcid)
+{
+	return wcid->def_wcid ? wcid->def_wcid : wcid;
+}
+
 static inline struct ieee80211_sta *
 wcid_to_sta(struct mt76_wcid *wcid)
 {
@@ -1548,6 +1559,8 @@ void mt76_sta_ps_transition(struct mt76_dev *dev, struct mt76_wcid *wcid,
 bool mt76_has_tx_pending(struct mt76_phy *phy);
 int mt76_update_channel(struct mt76_phy *phy);
 void mt76_update_survey(struct mt76_phy *phy);
+void mt76_phy_chandef_set(struct mt76_phy *phy,
+			  struct cfg80211_chan_def *chandef);
 void mt76_update_survey_active_time(struct mt76_phy *phy, ktime_t time);
 int mt76_get_survey(struct ieee80211_hw *hw, int idx,
 		    struct survey_info *survey);
@@ -1780,6 +1793,7 @@ static inline void mt76_testmode_reset(struct mt76_phy *phy, bool disable)
 #endif
 }
 
+extern const struct nla_policy mt76_tm_policy[NUM_MT76_TM_ATTRS];
 
 /* internal */
 static inline struct ieee80211_hw *
@@ -2059,8 +2073,7 @@ static inline void mt76_put_page_pool_buf(void *buf, bool allow_direct)
 {
 	struct page *page = virt_to_head_page(buf);
 
-	page_pool_put_full_page(pp_page_to_nmdesc(page)->pp, page,
-				allow_direct);
+	page_pool_put_full_page(page->pp, page, allow_direct);
 }
 
 static inline void *

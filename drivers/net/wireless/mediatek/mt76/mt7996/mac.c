@@ -1057,7 +1057,7 @@ int mt7996_tx_prepare_skb(struct mt76_dev *mdev, void *txwi_ptr,
 	if (!wcid)
 		wcid = &dev->mt76.global_wcid;
 
-	if ((is_8023 || ieee80211_is_data_qos(hdr->frame_control)) && sta->mlo &&
+	if ((is_8023 || ieee80211_is_data_qos(hdr->frame_control)) && sta && sta->mlo &&
 	    likely(tx_info->skb->protocol != cpu_to_be16(ETH_P_PAE))) {
 		u8 tid = tx_info->skb->priority & IEEE80211_QOS_CTL_TID_MASK;
 
@@ -1281,6 +1281,11 @@ mt7996_tx_check_aggr(struct ieee80211_link_sta *link_sta,
 		clear_bit(tid, &wcid->ampdu_state);
 }
 
+/* mt7996/mt7992 provide a HW MAC-TXP for AddBA req frames (MT_TXD7_MAC_TXD),
+ * but are otherwise FW-TXP devices. mt76_connac_txp_skb_unmap() would decode
+ * the MAC-TXP as a fw-txp and read nbuf as 0, leaving the skb mapping in
+ * buf[1] leaked. Unmap it from the MAC-TXP layout instead.
+ */
 static void
 mt7996_txp_skb_unmap(struct mt76_dev *mdev, struct mt76_txwi_cache *t)
 {
@@ -3285,8 +3290,10 @@ void mt7996_mac_add_twt_setup(struct ieee80211_hw *hw,
 	flow->tsf = le64_to_cpu(twt_agrt->twt);
 
 	if (mt7996_mcu_twt_agrt_update(dev, &msta->vif->deflink, flow,
-				       MCU_TWT_AGRT_ADD))
+				       MCU_TWT_AGRT_ADD)) {
+		list_del(&flow->list);
 		goto unlock;
+	}
 
 	setup_cmd = TWT_SETUP_CMD_ACCEPT;
 	dev->twt.table_mask |= BIT(table_id);
