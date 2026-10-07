@@ -312,6 +312,14 @@
 			#size-cells = <0>;
 			reg = <1>;
 		};
+
+		i2c_wifi: i2c@3 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <3>;
+
+			status = "disabled";
+		};
 	};
 };
 
